@@ -7,6 +7,11 @@ use Illuminate\Support\ServiceProvider;
 
 class HelperServiceProvider extends ServiceProvider
 {
+    public function boot()
+    {
+        $this->loadTranslationsFrom(__DIR__ . '/../lang', 'responser');
+    }
+
     public function register()
     {
         $this->loadMiddlewares();

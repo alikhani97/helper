@@ -1,9 +1,9 @@
 <?php
 
-namespace Celysium\Responser\Exceptions;
+namespace Alikhani\Helper\Exceptions;
 
 use Carbon\Exceptions\BadMethodCallException;
-use Celysium\Responser\Responser;
+use Alikhani\Helper\Responser;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;

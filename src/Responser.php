@@ -1,6 +1,6 @@
 <?php
 
-namespace Celysium\Responser;
+namespace Alikhani\Helper;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\ResourceCollection;

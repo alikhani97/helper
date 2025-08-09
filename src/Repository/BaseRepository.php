@@ -1,8 +1,8 @@
 <?php
 
-namespace Celysium\Helper\Repository;
+namespace Alikhani\Helper\Repository;
 
-use Celysium\Helper\Contracts\BaseRepositoryInterface;
+use Alikhani\Helper\Contracts\BaseRepositoryInterface;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;

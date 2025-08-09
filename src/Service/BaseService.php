@@ -1,9 +1,9 @@
 <?php
 
-namespace Celysium\Helper\Service;
+namespace Alikhani\Helper\Service;
 
-use Celysium\Helper\Contracts\BaseRepositoryInterface;
-use Celysium\Helper\Contracts\BaseServiceInterface;
+use Alikhani\Helper\Contracts\BaseRepositoryInterface;
+use Alikhani\Helper\Contracts\BaseServiceInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;

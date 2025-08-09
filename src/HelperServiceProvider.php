@@ -1,8 +1,8 @@
 <?php
 
-namespace Celysium\Helper;
+namespace Alikhani\Helper;
 
-use Celysium\Helper\Middlewares\Mobile;
+use Alikhani\Helper\Middlewares\Mobile;
 use Illuminate\Support\ServiceProvider;
 
 class HelperServiceProvider extends ServiceProvider

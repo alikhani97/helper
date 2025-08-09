@@ -1,5 +1,5 @@
 {
-    "name": "celysium/helper",
+    "name": "alikhani/helper",
     "description": "The package contains the most commonly used helper function",
     "keywords": [
         "Laravel",
@@ -9,7 +9,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "Celysium\\Helper\\": "src/"
+            "Alikhani\\Helper\\": "src/"
         },
         "files": [
             "src/helper.php"
@@ -17,20 +17,20 @@
     },
     "authors": [
         {
-            "name": "Nasser Hekmati",
-            "email": "hekmati.nasser@gmail.com"
+            "name": "Mehdi Alikhani",
+            "email": "mahdi.alikhani855@hotmail.com"
         }
     ],
     "extra": {
         "laravel": {
             "providers": [
-                "Celysium\\Helper\\HelperServiceProvider"
+                "Alikhani\\Helper\\HelperServiceProvider"
             ]
         }
     },
     "require": {
-        "php": "^8.2",
-        "laravel/framework": "^10.0|^11.0"
+        "php": "^8.3",
+        "laravel/framework": "^11.0|^12.0"
     },
     "minimum-stability": "stable",
     "prefer-stable": true

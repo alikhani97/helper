@@ -1,6 +1,6 @@
 <?php
 
-namespace Celysium\Helper\Rules;
+namespace Alikhani\Helper\Rules;
 
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;

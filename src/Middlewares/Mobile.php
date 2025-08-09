@@ -1,6 +1,6 @@
 <?php
 
-namespace Celysium\Helper\Middlewares;
+namespace Alikhani\Helper\Middlewares;
 
 use Closure;
 use Illuminate\Http\Request;

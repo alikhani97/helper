@@ -1,5 +1,5 @@
 <?php
-namespace Celysium\Helper\Contracts;
+namespace Alikhani\Helper\Contracts;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;

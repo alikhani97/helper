@@ -1,6 +1,6 @@
 <?php
 
-namespace Celysium\Helper\Contracts;
+namespace Alikhani\Helper\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;

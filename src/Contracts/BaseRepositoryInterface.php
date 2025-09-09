@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace Alikhani\Helper\Contracts;
 
 use Illuminate\Database\Eloquent\Builder;
@@ -12,17 +14,21 @@ interface BaseRepositoryInterface
 
     public function all(array $columns = ['*']): Collection;
 
-    public function list(array $parameters, array $columns = ['*']): Builder|Collection|LengthAwarePaginator|array;
+    public function list(array $parameters, array $columns = ['*'], ?callable $tap = null): Builder|Collection|LengthAwarePaginator|array;
 
     public function query(): Builder;
 
-    public function find(int|string $id, $columns = ['*']): ?Model;
+    public function withQuery(callable $tap): static;
 
-    public function findOrFail(int|string $id, $columns = ['*']): ?Model;
+    public function clearQuery(): static;
 
-    public function findByField($field, $value, $columns = ['*']): ?Model;
+    public function find(int|string $id, array $columns = ['*']): ?Model;
 
-    public function findOrFailByField($field, $value, $columns = ['*']): ?Model;
+    public function findOrFail(int|string $id, array $columns = ['*']): Model;
+
+    public function findByField(string $field, mixed $value, array $columns = ['*']): ?Model;
+
+    public function findOrFailByField(string $field, mixed $value, array $columns = ['*']): Model;
 
     public function store(array $parameters): Model;
 

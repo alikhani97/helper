@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Alikhani\Helper\Repository;
 
@@ -10,64 +11,115 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
-/**
- * @property Model $model
- * @property static string $entity
- */
 class BaseRepository implements BaseRepositoryInterface
 {
-    protected static string $entity;
+    protected static string $entity = '';
 
-    /**
-     * @param string $name
-     * @return Model|void
-     * @throws Exception
-     */
+    /** @var array<callable(Builder): Builder> */
+    protected array $queryTaps = [];
+
     public function __get(string $name)
     {
-        if ($name == 'model') {
+        if ($name === 'model') {
             return static::instance();
         }
     }
 
-    /**
-     * @return Model
-     * @throws Exception
-     */
     public static function instance(): Model
     {
-        $instance = new static::$entity();
+        $entity = static::$entity;
+
+        if ($entity === '' || !class_exists($entity)) {
+            throw new Exception('Repository $entity (' . static::class . ') must be set to a valid Model FQCN.');
+        }
+
+        $instance = new $entity();
 
         if (!$instance instanceof Model) {
-            throw new Exception("Class ". static::$entity ." must be an instance of Illuminate\\Database\\Eloquent\\Model");
+            throw new Exception("Class {$entity} must extend Illuminate\\Database\\Eloquent\\Model");
         }
 
         return $instance;
     }
 
-    public function all(array $columns = ['*']): Collection
+    public function query(): Builder
     {
-        return $this->model->query()->get($columns);
+        $q = $this->model->newQuery()->select($this->defaultSelect());
+
+        if ($with = $this->defaultWith()) {
+            $q->with($with);
+        }
+        if ($withC = $this->defaultWithCount()) {
+            $q->withCount($withC);
+        }
+
+        foreach ($this->defaultScopes() as $scope => $args) {
+            $q->{$scope}(...(array)$args);
+        }
+
+        foreach ($this->queryTaps as $tap) {
+            $q = $tap($q);
+        }
+
+        return $q;
     }
 
-    public function list(array $parameters, array $columns = ['*']): Builder|Collection|LengthAwarePaginator|array
+    public function withQuery(callable $tap): static
     {
-        $builder = $this->model->query();
+        $this->queryTaps[] = $tap;
+        return $this;
+    }
 
-        $builder = $this->query($parameters);
+    public function clearQuery(): static
+    {
+        $this->queryTaps = [];
+        return $this;
+    }
 
+    public function all(array $columns = ['*']): Collection
+    {
+        return $this->query()->get($columns);
+    }
+
+    public function list(array $parameters, array $columns = ['*'], ?callable $tap = null): Builder|Collection|LengthAwarePaginator|array
+    {
+        $builder = $this->listQuery($this->query(), $parameters);
+        $builder = $this->applyIncludes($builder, $parameters);
         $builder = $this->filterConditions($builder, $parameters);
+
+        if ($tap) {
+            $builder = $tap($builder) ?? $builder;
+        }
 
         $builder = $this->sort($builder, $parameters);
 
         return $this->export($builder, $parameters, $columns);
     }
 
-    public function query(): Builder
+    protected function defaultWith(): array
     {
-        return $this->model->query();
+        return [];
     }
 
+    protected function defaultWithCount(): array
+    {
+        return [];
+    }
+
+    protected function defaultSelect(): array
+    {
+        return ['*'];
+    }
+
+    protected function defaultScopes(): array
+    {
+        return [];
+    }
+
+    protected function listQuery(Builder $q, array $parameters): Builder
+    {
+        return $q;
+    }
 
     protected function conditions(Builder $query): array
     {
@@ -77,27 +129,79 @@ class BaseRepository implements BaseRepositoryInterface
     private function filterConditions(Builder $query, array $parameters): Builder
     {
         $conditions = $this->conditions($query);
-        if (empty($parameters) || empty($conditions) || empty($commons = array_intersect(array_keys($parameters), array_keys($conditions)))) {
+        if (empty($parameters) || empty($conditions)) {
             return $query;
         }
+
+        $commons = array_intersect(array_keys($parameters), array_keys($conditions));
+        if (empty($commons)) {
+            return $query;
+        }
+
         foreach ($commons as $field) {
             $condition = $conditions[$field];
             $value = $parameters[$field];
+
             if (is_callable($condition)) {
-                $query = $condition($value);
-            } elseif ($condition == 'like') {
-                $query->where($field, 'like', "%$value%");
-            } else {
-                $query->where($field, $condition, $value);
+                $query = $condition($query, $value) ?? $query;
+                continue;
+            }
+
+            switch ($condition) {
+                case 'like':
+                    if ($value !== null && $value !== '') {
+                        $query->where($field, 'like', "%{$value}%");
+                    }
+                    break;
+
+                case 'in':
+                    if (is_array($value) && !empty($value)) {
+                        $query->whereIn($field, $value);
+                    }
+                    break;
+
+                case 'between':
+                    if (is_array($value) && count($value) === 2) {
+                        $query->whereBetween($field, [$value[0], $value[1]]);
+                    }
+                    break;
+
+                case 'null':
+                    $query->whereNull($field);
+                    break;
+
+                case 'not_null':
+                    $query->whereNotNull($field);
+                    break;
+
+                default:
+                    // default comparison (e.g. '=', '!=', '>', '<=')
+                    if ($value === null) {
+                        $query->whereNull($field);
+                    } else {
+                        $query->where($field, (string)$condition, $value);
+                    }
             }
         }
+
         return $query;
     }
 
     protected function sort(Builder $query, array $parameters): Builder
     {
-        return $query
-            ->orderBy($parameters['sort_by'] ?? $this->model->getKeyName(), $parameters['sort_direction'] ?? 'desc');
+        $direction = strtolower((string)($parameters['sort_direction'] ?? 'desc'));
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
+
+        $allowed = $this->sortableColumns();
+        $sortBy = $parameters['sort_by'] ?? $this->model->getKeyName();
+        $column = in_array($sortBy, $allowed, true) ? $sortBy : $this->model->getKeyName();
+
+        return $query->orderBy($column, $direction);
+    }
+
+    protected function sortableColumns(): array
+    {
+        return [$this->model->getKeyName(), 'created_at'];
     }
 
     protected function export(Builder $query, array $parameters, array $columns = ['*']): Builder|Collection|LengthAwarePaginator|array
@@ -106,65 +210,87 @@ class BaseRepository implements BaseRepositoryInterface
             'builder' => $query->select($columns),
             'collection' => $query->get($columns),
             'array' => $query->get($columns)->toArray(),
-            default => $query->paginate($parameters['per_page'] ?? $this->model->getPerPage(), $columns)
+            default => $query->paginate(
+                perPage: (int)($parameters['per_page'] ?? $this->model->getPerPage()),
+                columns: $columns
+            ),
         };
+    }
+
+    protected function applyIncludes(Builder $q, array $parameters): Builder
+    {
+        if (!empty($parameters['with'])) {
+            $q->with((array)$parameters['with']);
+        }
+        if (!empty($parameters['with_count'])) {
+            $q->withCount((array)$parameters['with_count']);
+        }
+
+        $usesSoftDeletes = in_array(
+            'Illuminate\\Database\\Eloquent\\SoftDeletes',
+            class_uses_recursive(get_class($this->model))
+        );
+
+        if ($usesSoftDeletes) {
+            if (!empty($parameters['only_trashed'])) {
+                $q->onlyTrashed();
+            } elseif (!empty($parameters['with_trashed'])) {
+                $q->withTrashed();
+            }
+        }
+
+        return $q;
     }
 
     public function find(int|string $id, $columns = ['*']): ?Model
     {
-        return $this->model->query()->find($id, $columns);
+        return $this->query()->find($id, $columns);
     }
 
-    public function findOrFail(int|string $id, $columns = ['*']): ?Model
+    public function findOrFail(int|string $id, $columns = ['*']): Model
     {
-        return $this->model->query()->findOrFail($id, $columns);
+        return $this->query()->findOrFail($id, $columns);
     }
-    public function findByField($field, $value, $columns = ['*']): ?Model
+
+    public function findByField(string $field, mixed $value, $columns = ['*']): ?Model
     {
-        return $this->model->query()
-                           ->where($field, $value)->first($columns);
+        return $this->query()->where($field, $value)->first($columns);
     }
-    public function findOrFailByField($field, $value, $columns = ['*']): ?Model
+
+    public function findOrFailByField(string $field, mixed $value, $columns = ['*']): Model
     {
-        return $this->model->query()
-                           ->where($field, $value)->firstOrFail($columns);
+        return $this->query()->where($field, $value)->firstOrFail($columns);
     }
 
     public function store(array $parameters): Model
     {
-        return $this->model->query()
-                           ->create($parameters);
+        return $this->query()->create($parameters);
     }
 
     public function update(Model $model, array $parameters): Model
     {
         $model->update($parameters);
-
         return $model->refresh();
     }
 
     public function updateById(int|string $id, array $parameters): bool
     {
-        $result = $this->model->query()
-                              ->where($this->model->getKeyName(), $id)
-                              ->update($parameters);
+        $affected = $this->query()->whereKey($id)->update($parameters);
 
-        if ($result === 0) {
+        if ($affected === 0) {
             throw (new ModelNotFoundException)->setModel(get_class($this->model), [$id]);
         }
 
-        return $result;
+        return $affected > 0;
     }
 
     public function destroy(Model $model): bool
     {
-        return $model->delete();
+        return (bool)$model->delete();
     }
 
     public function destroyById(int|string $id): bool
     {
-        return $this->model->query()
-                           ->where('id', $id)
-                           ->delete();
+        return $this->query()->whereKey($id)->delete();
     }
 }
